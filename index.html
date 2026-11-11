@@ -2,16 +2,8 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="CSV形式の時間割を読み込み、授業コマの譲渡・交換・移動案を作成するアプリです。">
-  <meta name="theme-color" content="#07549b">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="時間割調整">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
-  <title>時間割調整アプリ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>時間割調整アプリ ver2</title>
   <style>
     :root { color-scheme: light dark; font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif; }
     body { margin:0; color:CanvasText; background:Canvas; } main { max-width:1020px; margin:0 auto; padding:28px 20px 48px; }
@@ -32,7 +24,7 @@
 </head>
 <body>
   <main>
-    <h1>時間割調整アプリ</h1>
+    <h1>時間割調整アプリ ver2</h1>
     <p class="lead">時間割CSVを一度読み込み、調整したい内容に合わせてメニューを切り替えてください。</p>
 
     <section class="panel" aria-labelledby="load-heading">
@@ -155,7 +147,7 @@
 
   function crossSelection(teacher,day,period){return selection(teacher,day,period);}
   function updateCrossSummary(){cross.summary.replaceChildren();setMessage(cross.message,'');const first=crossSelection(cross.teacherA,cross.dayA,cross.periodA),second=crossSelection(cross.teacherB,cross.dayB,cross.periodB);if(!first||!second)return;const text=document.createElement('strong');text.textContent=`${first.teacher.name}先生 ${timeLabel(first.day,first.period)}　⇄　${second.teacher.name}先生 ${timeLabel(second.day,second.period)}`;cross.summary.append(text);[first,second].forEach(item=>{if(item.cell.classId){const pill=document.createElement('span');pill.className='pill';pill.textContent=item.cell.subject?`${item.cell.classId}・${item.cell.subject}`:item.cell.classId;cross.summary.append(pill)}});}
-  function searchCross(){const first=crossSelection(cross.teacherA,cross.dayA,cross.periodA),second=crossSelection(cross.teacherB,cross.dayB,cross.periodB);clearResults();setMessage(cross.message,'');if(!first||!second)return;if(!first.cell.classId||!second.cell.classId)return setMessage(cross.message,'2つとも組の授業コマを選んでください。',true);if(first.teacher.name===second.teacher.name||first.time===second.time)return setMessage(cross.message,'異なる教員・異なる時限の授業コマを選んでください。',true);const state=workingState(),firstTeam=first.teamId,secondTeam=second.teamId;if(firstTeam===undefined||secondTeam===undefined)return setMessage(cross.message,'選択した授業を特定できません。',true);if(sameMembers(firstTeam,secondTeam))return setMessage(cross.message,'同時担当を含む同じ教員どうしの交換はできません。',true);const firstSlot=state.pos[firstTeam],secondSlot=state.pos[secondTeam],forced={kind:'指定交換',classId:`${first.cell.classId} ⇄ ${second.cell.classId}`,first:firstTeam,firstSlot,second:secondTeam,secondSlot};const result=solve(rawSwap(state,firstSlot,secondSlot,null),current=>conflictTeams(current).size===0,current=>adjustmentOperations(current,{differentTeachers:true}));setMessage(cross.message,'指定交換で生じる重複授業を探索しました。');render(result,{title:'コマの交換案',empty:'重複授業を解消する交換案は見つかりませんでした。',intro:'指定交換の後、表を上から順に実施してください。',forced:[forced]});}
+  function searchCross(){const first=crossSelection(cross.teacherA,cross.dayA,cross.periodA),second=crossSelection(cross.teacherB,cross.dayB,cross.periodB);clearResults();setMessage(cross.message,'');if(!first||!second)return;if(!first.cell.classId||!second.cell.classId)return setMessage(cross.message,'2つとも組の授業コマを選んでください。',true);if(first.time===second.time)return setMessage(cross.message,'異なる時限の授業コマを選んでください。',true);const sameTeacher=first.teacher.name===second.teacher.name,sameClass=first.cell.classId===second.cell.classId,differentLesson=normal(first.cell.subject)!==normal(second.cell.subject),sameTeacherLessonSwap=sameTeacher&&sameClass&&differentLesson;if(sameTeacher&&!sameTeacherLessonSwap)return setMessage(cross.message,'同じ教員どうしは、同じ組で授業名が異なるコマだけ交換できます。',true);const state=workingState(),firstTeam=first.teamId,secondTeam=second.teamId;if(firstTeam===undefined||secondTeam===undefined)return setMessage(cross.message,'選択した授業を特定できません。',true);if(sameMembers(firstTeam,secondTeam)&&!sameTeacherLessonSwap)return setMessage(cross.message,'同時担当を含む同じ教員どうしの交換はできません。',true);const firstSlot=state.pos[firstTeam],secondSlot=state.pos[secondTeam],forced={kind:'指定交換',classId:`${first.cell.classId} ⇄ ${second.cell.classId}`,first:firstTeam,firstSlot,second:secondTeam,secondSlot},forcedState=rawSwap(state,firstSlot,secondSlot,null),locked=new Set([firstTeam,secondTeam]),result=solve(forcedState,current=>conflictTeams(current).size===0&&current.pos[firstTeam]===secondSlot&&current.pos[secondTeam]===firstSlot,current=>adjustmentOperations(current,{locked,differentTeachers:true}));setMessage(cross.message,'指定交換を維持したまま、発生する重複授業を探索しました。');render(result,{title:'コマの交換案',empty:'指定交換を維持したまま重複授業を解消する交換案は見つかりませんでした。',intro:'指定交換の後、表を上から順に実施してください。',forced:[forced]});}
 
   function currentMove(){const teacher=teacherByName.get(move.teacher.value),sourceDay=move.sourceDay.value,sourcePeriod=Number(move.sourcePeriod.value),targetDay=move.targetDay.value,targetPeriod=Number(move.targetPeriod.value);return teacher&&sourceDay&&sourcePeriod&&targetDay&&targetPeriod?{teacher,sourceDay,sourcePeriod,targetDay,targetPeriod,sourceTime:timeKey(sourceDay,sourcePeriod),targetTime:timeKey(targetDay,targetPeriod)}:null;}
   function updateMoveSummary(){move.summary.replaceChildren();setMessage(move.message,'');const request=currentMove();if(!request)return;const cell=request.teacher.cells[request.sourceTime],text=document.createElement('strong');text.textContent=`${request.teacher.name}先生　${timeLabel(request.sourceDay,request.sourcePeriod)} → ${timeLabel(request.targetDay,request.targetPeriod)}`;move.summary.append(text);if(cell.classId){const pill=document.createElement('span');pill.className='pill';pill.textContent=cell.subject?`${cell.classId}・${cell.subject}`:cell.classId;move.summary.append(pill);}}
@@ -222,3 +214,4 @@
   </script>
 </body>
 </html>
+
